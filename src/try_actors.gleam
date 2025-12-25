@@ -1,5 +1,6 @@
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
+import gleam/string
 
 /// Actor-based state management system using Gleam's OTP library
 ///
@@ -22,6 +23,45 @@ pub type Message {
   Get(Subject(Int))
 }
 
+/// Display state changes and operation details
+///
+/// # Parameters
+/// - `operation: Message` - The message being processed (or Nil for initial state)
+/// - `old_state: Int` - State before the operation
+/// - `new_state: Int` - State after the operation (if applicable)
+///
+/// # Returns
+/// `Nil` - Unit value, used for side effects only
+pub fn display_state_change(
+  operation: Result(Message, Nil),
+  old_state: Int,
+  new_state: Int,
+) -> Nil {
+  let operation_type = case operation {
+    Ok(Add(value)) -> {
+      let message = "Adding " <> string.inspect(value) <> " to state"
+      echo message
+      "State after Add: "
+    }
+    Ok(Get(_)) -> {
+      echo "Getting current state"
+      "Current state: "
+    }
+    Error(Nil) -> {
+      echo "Initial state"
+      "Initial state: "
+    }
+  }
+
+  let message =
+    operation_type
+    <> string.inspect(old_state)
+    <> " -> "
+    <> string.inspect(new_state)
+  echo message
+  Nil
+}
+
 /// Message handler for the actor state machine
 ///
 /// Processes incoming messages and returns the next state with continuation.
@@ -38,10 +78,14 @@ pub fn handle_message(state: Int, message: Message) -> actor.Next(Int, Message) 
   case message {
     Add(i) -> {
       let new_state = state + i
+      display_state_change(Ok(Add(i)), state, new_state)
       actor.continue(new_state)
     }
 
     Get(reply) -> {
+      // State does NOT change within this block
+      // The current state is only read and sent via reply channel
+      display_state_change(Ok(Get(reply)), state, state)
       actor.send(reply, state)
       actor.continue(state)
     }
@@ -49,29 +93,32 @@ pub fn handle_message(state: Int, message: Message) -> actor.Next(Int, Message) 
 }
 
 /// Handle Add message: increment state and log changes
-///
+/// 
 /// Steps:
-/// 1. Log current state for debugging
+/// 1. Display current state before addition
 /// 2. Calculate new state by adding the provided value
-/// 3. Log the updated state
+/// 3. Display the updated state
 /// 4. Return continuation with new state
 /// Handle Get message: send current state via reply channel
-///
+/// 
 /// Steps:
-/// 1. Send current state to the provided reply channel
-/// 2. Return continuation with unchanged state
-///
-/// Note: Commented out echo statements for production use
+/// 1. Display current state being retrieved
+/// 2. Send current state to the provided reply channel
+/// 3. Return continuation with unchanged state
 /// Demonstration of actor usage and message passing
-///
+/// 
 /// This main function showcases:
 /// 1. Creating an actor with initial state 0
 /// 2. Sending asynchronous Add messages to modify state
 /// 3. Sending a synchronous Get message to retrieve final state
-///
-/// Expected result: Actor state starts at 0, adds 5 (state = 5),
+/// 4. Displaying all state changes throughout the process
+/// 
+/// Expected result: Actor state starts at 0, adds 5 (state = 5), 
 /// adds 3 (state = 8), and final Get returns 8
 pub fn main() {
+  // Display initial state
+  display_state_change(Error(Nil), 0, 0)
+
   // Start an actor with initial state 0 and our message handler
   let assert Ok(actor) =
     actor.new(0)
