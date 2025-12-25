@@ -1,6 +1,28 @@
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
 
+pub type Message {
+  Add(Int)
+  Get(Subject(Int))
+}
+
+pub fn handle_message(state: Int, message: Message) -> actor.Next(Int, Message) {
+  case message {
+    Add(i) -> {
+      echo state
+      let state = state + i
+      echo state
+      actor.continue(state)
+    }
+    Get(reply) -> {
+      // echo reply
+      // echo state
+      actor.send(reply, state)
+      actor.continue(state)
+    }
+  }
+}
+
 pub fn main() {
   // Start an actor
   let assert Ok(actor) =
@@ -14,22 +36,4 @@ pub fn main() {
 
   // Send a message and get a reply
   assert actor.call(actor.data, waiting: 10, sending: Get) == 8
-}
-
-pub fn handle_message(state: Int, message: Message) -> actor.Next(Int, Message) {
-  case message {
-    Add(i) -> {
-      let state = state + i
-      actor.continue(state)
-    }
-    Get(reply) -> {
-      actor.send(reply, state)
-      actor.continue(state)
-    }
-  }
-}
-
-pub type Message {
-  Add(Int)
-  Get(Subject(Int))
 }
